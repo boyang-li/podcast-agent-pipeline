@@ -24,7 +24,7 @@ class JsonFormatter(logging.Formatter):
             if key in payload:
                 continue
             payload[key] = value
-        return json.dumps(payload, ensure_ascii=False)
+        return json.dumps(payload, ensure_ascii=False, default=str)
 
 
 def configure_logging(level: int = logging.INFO) -> None:

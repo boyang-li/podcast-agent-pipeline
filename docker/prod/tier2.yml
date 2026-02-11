@@ -10,7 +10,10 @@ services:
       - "6333:6333"
 
   metadata-worker:
-    image: ghcr.io/boyang-li/pap/metadata:${IMAGE_TAG-latest}
+    image: metadata:${IMAGE_TAG-latest}
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.metadata
     env_file:
       - ../../.env
     volumes:

@@ -89,6 +89,7 @@ All three tier nodes connect via a dedicated 2.5 Gbps Ethernet switch uplinked
 - **Runner:** Self-hosted GitHub Actions runner on `etl-node-01`
 - **Local Dev:** MBP M4 builds + tests via Docker Compose (CPU mocks). No production data processed locally.
 - **Testing:** `pytest` covers Watcher/Ear/Brain/Courier modules and a mocked Prefect flow; set `PAP_STORAGE_ROOT` + sandbox `.env` to avoid touching `/srv`. Telegram/yt-dlp/Ollama calls are monkeypatched in tests.
+- **Current Staging Status:** Tier 1 stack (Prefect server/worker, Redpanda, Watcher, Courier placeholder) is running on `etl-node-01`. Watcher successfully downloaded All-In YouTube episodes into `/srv/pap/raw`. Prefect UI reachable at `http://192.168.2.81:4200/`. Tier 2/3 to be deployed next.
 - **Flow:**
   1. Developer verifies changes locally in containers (unit tests, lint, mock flows).
   2. `git push` triggers GitHub Action on `etl-node-01` (staging pipeline).

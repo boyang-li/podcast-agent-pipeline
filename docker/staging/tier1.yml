@@ -3,6 +3,7 @@ version: "3.9"
 services:
   prefect-db:
     image: postgres:15-alpine
+    restart: unless-stopped
     env_file:
       - ../../.env
     environment:
@@ -13,14 +14,13 @@ services:
       - prefect-db-data:/var/lib/postgresql/data
 
   prefect-server:
-    image: prefecthq/prefect:2-python3.11
+    image: prefecthq/prefect:3-python3.12
     depends_on:
       - prefect-db
     env_file:
       - ../../.env
     environment:
       PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${PREFECT_DB_USER-prefect}:${PREFECT_DB_PASSWORD-prefect}@prefect-db:5432/${PREFECT_DB_NAME-prefect}
-      PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_SERVER_API_HOST: 0.0.0.0
       PREFECT_SERVER_API_PORT: "4200"
       PREFECT_SERVER_SERVICES_SCHEDULER_ENABLED: "true"
@@ -29,9 +29,10 @@ services:
     volumes:
       - prefect-orion-data:/home/prefect/.prefect
     command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+    restart: unless-stopped
 
   prefect-worker-default:
-    image: prefecthq/prefect:2-python3.11
+    image: prefecthq/prefect:3-python3.12
     depends_on:
       - prefect-server
     env_file:
@@ -40,9 +41,10 @@ services:
       PREFECT_API_URL: http://prefect-server:4200/api
       PREFECT_LOGGING_LEVEL: INFO
     command: ["prefect", "worker", "start", "--pool", "default", "--name", "staging-tier1"]
+    restart: unless-stopped
 
   redpanda:
-    image: docker.redpanda.com/vectorized/redpanda:v23.3.5
+    image: redpandadata/redpanda:v23.3.5
     command:
       - redpanda
       - start
@@ -58,9 +60,13 @@ services:
       - --check=false
     ports:
       - "9092:9092"
+    restart: unless-stopped
 
   watcher:
-    image: ghcr.io/boyang-li/pap/watcher:${IMAGE_TAG-staging}
+    image: watcher:${IMAGE_TAG-staging}
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.watcher
     env_file:
       - ../../.env
     depends_on:
@@ -68,15 +74,20 @@ services:
     volumes:
       - /srv/pap/raw:/srv/pap/raw
       - /srv/pap/meta:/srv/pap/meta
+    restart: unless-stopped
 
   courier:
-    image: ghcr.io/boyang-li/pap/courier:${IMAGE_TAG-staging}
+    image: courier:${IMAGE_TAG-staging}
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.courier
     env_file:
       - ../../.env
     depends_on:
       - prefect-worker-default
     volumes:
       - /srv/pap/summaries:/srv/pap/summaries
+    restart: unless-stopped
 
 volumes:
   prefect-db-data:

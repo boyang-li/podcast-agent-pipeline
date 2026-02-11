@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml README.md /app/
+COPY src /app/src
+COPY config /app/config
+
+RUN pip install --upgrade pip && pip install .[dev]
+
+ENV PYTHONPATH=/app/src
+
+ENTRYPOINT ["python", "-m", "watcher.main"]

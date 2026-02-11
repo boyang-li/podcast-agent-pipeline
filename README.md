@@ -76,11 +76,12 @@ IMAGE_TAG=latest docker compose -f docker/prod/tier3.yml up -d --pull always
 | Watcher CLI smoke | `python -m watcher.main --config config/feeds.yaml` | Set `PAP_STORAGE_ROOT` to a temp directory; when Prefect workers aren’t running, tasks fall back to synchronous execution |
 | Ear FastAPI | `uvicorn ear.api:app --reload` (then POST to `/transcribe`) | CPU-only stub returning deterministic segments |
 | Prefect flow dry-run | `python -m flows.pipeline https://example.com feed guid123 ./output/%(ext)s` | Exercises end-to-end pipeline with download/Telegram mocked; relies on `.env` defaults |
+| Staging Tier 1 smoke | `ssh bli@192.168.2.81 docker logs -f staging-watcher-1` | Confirms watcher flow downloads YouTube audio into `/srv/pap/raw` and records ledger entries. Prefect UI reachable at `http://192.168.2.81:4200/`. |
 
 Stick with these local validations until YouTube/Telegram credentials and GPU services are ready for staging deployment.
 
 ## Next Steps
-- Flesh out Watcher agent (RSS polling + yt-dlp ledger)
-- Implement Prefect flows + Dockerfiles per service
-- Stand up staging Docker stacks + registry on `etl-node-01`
-- Expand monitoring + alerting per `docs/system-specs.md`
+- Bring Tier 2 (mid-node-01) online with Qdrant + metadata services
+- Wire courier notifications end-to-end using real Telegram credentials
+- Add monitoring/logging (Loki/Grafana) and alerting hooks
+- Expand Prefect deployments (scheduled watcher runs, flow retries)

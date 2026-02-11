@@ -15,7 +15,8 @@
 
 - **Network:** All nodes hardwired via 2.5 Gbps switch with 1 Gbps uplink to router; SSH key access from MBP M4.
 - **Energy Policy:** Respect the night-time GPU burst schedule (off-peak 19:00–07:00). Schedule heavy jobs through Prefect’s Scheduling Agent; prioritize Tier 2 for light tasks to save power.
-- **Testing Reminder:** Run `pytest` before any cluster deploy; suite mocks Telegram/Ollama/yt-dlp so it should pass locally without secrets.
+- **Testing Reminder:** Run `pytest` before any cluster deploy; suite mocks Telegram/Ollama/yt-dlp so it should pass locally without secrets. In staging, Watcher is verified on etl-node-01 (downloads All-In podcast audio) and Prefect UI is reachable at `http://192.168.2.81:4200/`.
+- **Current Status:** Tier 1 stack (Prefect server/worker, Redpanda, Watcher, Courier placeholder) is live on `etl-node-01`. Tier 2/3 not yet deployed.
 
 ## 2. Claude Engagement Rules
 1. **Plan → Execute:** Every non-trivial task starts with a `/plan` mindset. Use `<analysis>` sections to spell out intent, risks, and parallel search strategy before editing.
@@ -87,6 +88,10 @@
        description="stage files", prompt="Run git add -A")
   ```
 - **Tests:** `pytest` (full suite). Set `PAP_STORAGE_ROOT` to a writable path when running outside pytest fixtures to avoid `/srv` permissions.
+- **Staging Verification:**
+  - Watcher logs on etl-node show successful downloads; inspect `/srv/pap/raw/all-in` for MP3/JSON.
+  - Prefect UI accessible at `http://192.168.2.81:4200/`; ensure browser uses LAN IP (avoids `prefect-server` DNS errors).
+  - Known issues: watcher currently restarts after each run (single-pass flow); courier container is placeholder until Telegram notifier is finalized.
 
 ## 7. Git & Review Discipline
 1. **Commits:** Only when explicitly requested. Single-purpose commits with clear, action-oriented messages.

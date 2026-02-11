@@ -30,3 +30,18 @@ docker compose -f docker/prod/tier3.yml pull && docker compose -f docker/prod/ti
 ```
 
 > **Note:** staging stacks default to `IMAGE_TAG=staging`; production uses `IMAGE_TAG=latest`. Override by exporting `IMAGE_TAG` before running compose commands.
+
+## Building Images Locally
+
+When GHCR access isn’t available, build the service images on each node before running Compose:
+
+```bash
+cd /opt/pap/podcast-agent-pipeline
+docker build -f docker/Dockerfile.watcher -t watcher:staging .
+docker build -f docker/Dockerfile.courier -t courier:staging .
+docker build -f docker/Dockerfile.ear -t ear:staging .
+docker build -f docker/Dockerfile.brain -t brain:staging .
+# Add metadata Dockerfile/build once metadata service exists
+```
+
+Swap `staging` for `latest` when preparing production builds. Ensure `.env` is populated on each node before composing.

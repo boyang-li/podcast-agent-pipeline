@@ -41,6 +41,8 @@
   - The module depends on `feedparser` and `yt-dlp`. Missing deps caused early test failures—ensure they’re installed before invoking Watcher.
   - Tests cannot write to `/srv`; use `PAP_STORAGE_ROOT` to redirect outputs during local runs.
   - Prefect decorators are optional; when Prefect isn’t installed the flow still runs synchronously—mirror this pattern for new tasks.
+  - Production watchers need Node.js + ffmpeg inside the container for yt-dlp (JS runtime + post-processing). If missing, downloads fail with `No supported JavaScript runtime` or `ffmpeg not found`.
+  - Prefect `watcher_flow` currently runs once per container start; create a scheduled deployment or add loop if continuous polling is desired.
 
 ### 3.2 Ear — Transcription Agent (Docker service: `ear`, Tier 3 `gpu-node-01`)
 - **Purpose:** Convert audio to text using faster-whisper on `ai-node-01`.
@@ -99,6 +101,7 @@
   - Telegram API errors (404) surfaced during tests; mock `send_message` in unit tests to avoid hitting real endpoints.
   - Markdown renderer uses UTC timestamps; switched to timezone-aware `datetime.now(timezone.utc)` to avoid warnings.
   - `PAP_STORAGE_ROOT` must be writable before persisting summaries.
+  - Production containers require real Telegram credentials; in staging we run a placeholder command (tail) until notifier logic is finalized.
 
 ## 4. Operational Runbooks
 1. **Wake-on-LAN Failure**

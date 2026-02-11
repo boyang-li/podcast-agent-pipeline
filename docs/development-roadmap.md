@@ -1,9 +1,9 @@
 # Development Roadmap — Podcast-Agent-Pipeline
 
 ## 1. Reality Check
-- Repo currently contains documentation + scaffolding (`docs/*`, `docker/*`, `src/*` placeholders).
-- Full implementation (agents, flows, dockerfiles) still pending.
-- Architecture mandates containerized deployment: local Docker Compose on MBP (CPU mocks) + staging/prod stacks on `etl-node-01` (controller) and `ai-node-01` (GPU).
+- Repo now contains implemented Watcher/Ear/Brain/Courier services, Prefect flows, unit tests, and tiered Docker stacks.
+- Tier 1 (etl-node-01) staging environment is live; Tier 2 (mid-node-01) and Tier 3 (gpu-node-01) pending deployment.
+- Architecture mandates containerized deployment: local Docker Compose on MBP (CPU mocks) + staging/prod stacks on `etl-node-01` (gateway), `mid-node-01` (logic), and `gpu-node-01` (GPU).
 
 ## 2. Recommended Development Approach
 | Phase | Goals | Key Decisions |

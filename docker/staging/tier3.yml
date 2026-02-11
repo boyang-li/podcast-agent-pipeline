@@ -10,7 +10,10 @@ services:
     command: ["prefect", "worker", "start", "--pool", "gpu", "--name", "staging-tier3"]
 
   ear:
-    image: ghcr.io/boyang-li/pap/ear:${IMAGE_TAG-staging}
+    image: ear:${IMAGE_TAG-staging}
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.ear
     env_file:
       - ../../.env
     deploy:
@@ -30,7 +33,10 @@ services:
       - /srv/pap/transcripts:/srv/pap/transcripts
 
   brain:
-    image: ghcr.io/boyang-li/pap/brain:${IMAGE_TAG-staging}
+    image: brain:${IMAGE_TAG-staging}
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.brain
     env_file:
       - ../../.env
     depends_on:
