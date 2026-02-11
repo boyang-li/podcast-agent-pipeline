@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  prefect-worker-gpu:
+    image: prefecthq/prefect:2-python3.11
+    env_file:
+      - ../../.env
+    environment:
+      PREFECT_API_URL: http://192.168.2.81:4200/api
+    command: ["prefect", "worker", "start", "--pool", "gpu", "--name", "prod-tier3"]
+
+  ear:
+    image: ghcr.io/boyang-li/pap/ear:${IMAGE_TAG-latest}
+    env_file:
+      - ../../.env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    devices:
+      - "/dev/kfd:/dev/kfd"
+      - "/dev/dri:/dev/dri"
+    group_add:
+      - video
+    environment:
+      HSA_OVERRIDE_GFX_VERSION: "11.0.1"
+    volumes:
+      - /srv/pap/raw:/srv/pap/raw:ro
+      - /srv/pap/transcripts:/srv/pap/transcripts
+
+  brain:
+    image: ghcr.io/boyang-li/pap/brain:${IMAGE_TAG-latest}
+    env_file:
+      - ../../.env
+    depends_on:
+      - ear
+    volumes:
+      - /srv/pap/transcripts:/srv/pap/transcripts:ro
+      - /srv/pap/summaries:/srv/pap/summaries
+
+  ollama:
+    image: ollama/ollama:0.1.32
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+volumes:
+  ollama-data:

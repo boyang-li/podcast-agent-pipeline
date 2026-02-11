@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+  prefect-db:
+    image: postgres:15-alpine
+    env_file:
+      - ../../.env
+    environment:
+      POSTGRES_DB: ${PREFECT_DB_NAME-prefect}
+      POSTGRES_USER: ${PREFECT_DB_USER-prefect}
+      POSTGRES_PASSWORD: ${PREFECT_DB_PASSWORD-prefect}
+    volumes:
+      - prefect-db-data:/var/lib/postgresql/data
+
+  prefect-server:
+    image: prefecthq/prefect:2-python3.11
+    depends_on:
+      - prefect-db
+    env_file:
+      - ../../.env
+    environment:
+      PREFECT_API_DATABASE_CONNECTION_URL: postgresql+asyncpg://${PREFECT_DB_USER-prefect}:${PREFECT_DB_PASSWORD-prefect}@prefect-db:5432/${PREFECT_DB_NAME-prefect}
+      PREFECT_API_URL: http://prefect-server:4200/api
+      PREFECT_SERVER_API_HOST: 0.0.0.0
+      PREFECT_SERVER_API_PORT: "4200"
+      PREFECT_SERVER_SERVICES_SCHEDULER_ENABLED: "true"
+    ports:
+      - "4200:4200"
+    volumes:
+      - prefect-orion-data:/home/prefect/.prefect
+    command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+
+  prefect-worker-default:
+    image: prefecthq/prefect:2-python3.11
+    depends_on:
+      - prefect-server
+    env_file:
+      - ../../.env
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      PREFECT_LOGGING_LEVEL: INFO
+    command: ["prefect", "worker", "start", "--pool", "default", "--name", "prod-tier1"]
+
+  redpanda:
+    image: docker.redpanda.com/vectorized/redpanda:v23.3.5
+    command:
+      - redpanda
+      - start
+      - --mode
+      - dev-container
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --reserve-memory
+      - 0M
+      - --check=false
+    ports:
+      - "9092:9092"
+
+  watcher:
+    image: ghcr.io/boyang-li/pap/watcher:${IMAGE_TAG-latest}
+    env_file:
+      - ../../.env
+    depends_on:
+      - prefect-worker-default
+    volumes:
+      - /srv/pap/raw:/srv/pap/raw
+      - /srv/pap/meta:/srv/pap/meta
+
+  courier:
+    image: ghcr.io/boyang-li/pap/courier:${IMAGE_TAG-latest}
+    env_file:
+      - ../../.env
+    depends_on:
+      - prefect-worker-default
+    volumes:
+      - /srv/pap/summaries:/srv/pap/summaries
+
+volumes:
+  prefect-db-data:
+  prefect-orion-data:

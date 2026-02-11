@@ -1,0 +1,21 @@
+# Example feed configuration
+#
+# Copy to config/feeds.yaml and customize per environment.
+
+youtube:
+  - channel_id: UCflcEFoCaq3_g7DLz-4O0uA  # All-In Podcast
+    channel_name: all-in
+    poll_interval_minutes: 30
+  - channel_id: UCLr6-23QH6CQODXuu0DLReA  # Lex Fridman
+    channel_name: lex-fridman
+    poll_interval_minutes: 60
+
+rss:
+  - url: https://changelog.com/podcast/feed
+    channel_name: changelog
+    poll_interval_minutes: 120
+
+defaults:
+  audio_format: mp3
+  audio_quality: 5
+  sleep_interval_seconds: [5, 15]

@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.7.3
+    volumes:
+      - qdrant-data:/qdrant/storage
+      - /srv/pap/vector_backups:/backups
+    ports:
+      - "6333:6333"
+
+  metadata-worker:
+    image: ghcr.io/boyang-li/pap/metadata:${IMAGE_TAG-staging}
+    env_file:
+      - ../../.env
+    volumes:
+      - /srv/pap/raw:/srv/pap/raw:ro
+      - /srv/pap/meta:/srv/pap/meta
+    depends_on:
+      - qdrant
+
+  prefect-worker-logic:
+    image: prefecthq/prefect:2-python3.11
+    env_file:
+      - ../../.env
+    environment:
+      PREFECT_API_URL: http://192.168.2.81:4200/api
+    command: ["prefect", "worker", "start", "--pool", "logic", "--name", "staging-tier2"]
+
+volumes:
+  qdrant-data:

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "podcast-agent-pipeline"
+version = "0.1.0"
+description = "Prefect-orchestrated ingestion, transcription, and analysis pipeline for podcasts"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Boyang Li" }
+]
+dependencies = [
+  "prefect>=3.0.0,<4.0.0",
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "python-dotenv>=1.0",
+  "yt-dlp>=2024.01.01",
+  "feedparser>=6.0",
+  "pydantic>=2.6",
+  "httpx>=0.27",
+  "ollama>=0.1.0",
+  "sqlalchemy>=2.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.3",
+  "mypy>=1.8"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
