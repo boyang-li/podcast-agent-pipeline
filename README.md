@@ -45,7 +45,7 @@ Prefect-orchestrated home lab workflow that ingests podcast feeds (RSS + YouTube
 ## Development & Deployment Workflow
 1. **Develop locally** using Docker Desktop + `docker/docker-compose.local.yml`. GPU-heavy agents run as CPU mocks; focus on unit tests and integration flows without hardware dependencies.
 2. **Push to GitHub** only after local checks pass.
-3. **Self-hosted GitHub Action on `etl-node-01`** builds multi-arch Docker images, pushes to GHCR, and deploys directly to the production stacks (Tier 1–3). Every push to `main` redeploys live services.
+3. **Self-hosted GitHub Action on `etl-node-01`** builds multi-arch Docker images, pushes to GHCR, and deploys directly to the production stack (Tier 1–3). Every push to `main` redeploys live services.
 4. **Production verification** happens immediately after the workflow finishes—Prefect flows run on real hardware and Telegram alerts confirm success.
 
 ### Cluster Deployment Cheatsheet

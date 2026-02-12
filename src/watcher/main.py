@@ -111,7 +111,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run watcher tasks")
     parser.add_argument("--config", default=str(FEEDS_PATH), help="Path to feeds YAML")
     args = parser.parse_args()
-    watcher_flow(Path(args.config))
+    watcher_flow(config_path=Path(args.config))
 
 
 def _handle_download_result(item: FeedItem, path: str | None, downloaded: list[dict], queued: list[dict]) -> None:
