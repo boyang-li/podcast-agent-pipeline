@@ -114,10 +114,6 @@ def main() -> None:
     watcher_flow(Path(args.config))
 
 
-if __name__ == "__main__":
-    main()
-
-
 def _handle_download_result(item: FeedItem, path: str | None, downloaded: list[dict], queued: list[dict]) -> None:
     if not path:
         return
@@ -165,3 +161,7 @@ def _notify_watcher_status(channel: str, downloaded: list[dict], queued: list[di
             client.post(f"{COURIER_ENDPOINT}/watcher-status", json=payload)
     except httpx.HTTPError as exc:
         logging.error("failed to send watcher status", extra={"error": str(exc)})
+
+
+if __name__ == "__main__":
+    main()
