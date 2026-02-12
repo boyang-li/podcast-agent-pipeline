@@ -54,8 +54,8 @@ jobs:
               .
           done
 
-  deploy-staging:
-    name: Deploy to staging
+  deploy-staging-tier12:
+    name: Deploy staging tier1/tier2
     runs-on: [self-hosted, etl-node-01]
     needs: build-and-push
     permissions:
@@ -76,12 +76,12 @@ jobs:
         run: |
           cp /opt/pap/podcast-agent-pipeline/.env .env
 
-      - name: Pull and restart staging tiers
+      - name: Pull and restart staging tiers (tier1 & tier2)
         env:
           IMAGE_TAG: ${{ github.sha }}-staging
         run: |
           set -euo pipefail
-          for tier in tier1 tier2 tier3; do
+          for tier in tier1 tier2; do
             compose_file="docker/staging/${tier}.yml"
             if [ -f "$compose_file" ]; then
               IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
@@ -89,11 +89,51 @@ jobs:
             fi
           done
 
-      - name: Health checks
+      - name: Health checks (tier1 services)
         run: |
           curl --retry 5 --retry-all-errors --retry-delay 5 http://192.168.2.81:8200/health
-          curl --retry 5 --retry-all-errors --retry-delay 5 http://192.168.2.82:8000/health
-          curl --retry 5 --retry-all-errors --retry-delay 5 http://192.168.2.82:8100/health
+
+      - name: Cleanup env copy
+        if: always()
+        run: rm -f .env
+
+  deploy-staging-tier3:
+    name: Deploy staging tier3
+    runs-on: [self-hosted, ai-node-01]
+    needs:
+      - build-and-push
+      - deploy-staging-tier12
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Copy staging environment file
+        run: |
+          cp /opt/pap/podcast-agent-pipeline/.env .env
+
+      - name: Pull and restart staging tier3
+        env:
+          IMAGE_TAG: ${{ github.sha }}-staging
+        run: |
+          set -euo pipefail
+          compose_file="docker/staging/tier3.yml"
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
+
+      - name: Health checks (tier3 services)
+        run: |
+          curl --retry 5 --retry-all-errors --retry-delay 5 http://127.0.0.1:8000/health
+          curl --retry 5 --retry-all-errors --retry-delay 5 http://127.0.0.1:8100/health
 
       - name: Cleanup env copy
         if: always()
