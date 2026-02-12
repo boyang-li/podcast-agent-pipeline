@@ -31,6 +31,8 @@ env:
   EAR_API_KEY: ${{ vars.EAR_API_KEY }}
   BRAIN_API_KEY: ${{ vars.BRAIN_API_KEY }}
   COURIER_API_KEY: ${{ vars.COURIER_API_KEY }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -107,6 +109,8 @@ jobs:
           EAR_API_KEY=${EAR_API_KEY}
           BRAIN_API_KEY=${BRAIN_API_KEY}
           COURIER_API_KEY=${COURIER_API_KEY}
+          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+          TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
           EOF
 
       - name: Pull and restart staging tier1
@@ -170,6 +174,8 @@ jobs:
           EAR_API_KEY=${EAR_API_KEY}
           BRAIN_API_KEY=${BRAIN_API_KEY}
           COURIER_API_KEY=${COURIER_API_KEY}
+          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+          TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
           EOF
 
       - name: Pull and restart staging tier2
@@ -225,6 +231,8 @@ jobs:
           EAR_API_KEY=${EAR_API_KEY}
           BRAIN_API_KEY=${BRAIN_API_KEY}
           COURIER_API_KEY=${COURIER_API_KEY}
+          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+          TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
           EOF
 
       - name: Pull and restart staging tier3
@@ -295,6 +303,8 @@ jobs:
           EAR_API_KEY=${EAR_API_KEY}
           BRAIN_API_KEY=${BRAIN_API_KEY}
           COURIER_API_KEY=${COURIER_API_KEY}
+          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+          TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
           EOF
 
       - name: Pull and restart production tiers
