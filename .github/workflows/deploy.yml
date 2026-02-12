@@ -5,12 +5,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      promote_prod:
-        description: "Promote this commit to production"
-        required: false
-        default: false
-        type: boolean
 
 env:
   REGISTRY: ghcr.io/boyang-li/pap
@@ -68,12 +62,12 @@ jobs:
               --push \
               -f docker/Dockerfile.${service} \
               -t ${REGISTRY}/${service}:${GITHUB_SHA} \
-              -t ${REGISTRY}/${service}:${GITHUB_SHA}-staging \
+              -t ${REGISTRY}/${service}:latest \
               .
           done
 
-  deploy-staging-tier1:
-    name: Deploy staging tier1
+  deploy-prod-tier1:
+    name: Deploy prod tier1
     runs-on: [self-hosted, etl-node-01]
     needs: build-and-push
     permissions:
@@ -89,200 +83,6 @@ jobs:
           registry: ghcr.io
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Generate staging environment file
-        run: |
-          cat <<EOF > .env
-          PREFECT_API_URL=${PREFECT_API_URL}
-          PREFECT_SERVER_API_URL=${PREFECT_SERVER_API_URL}
-          PREFECT_UI_URL=${PREFECT_UI_URL}
-          PREFECT_UI_API_URL=${PREFECT_UI_API_URL}
-          PREFECT_DB_NAME=${PREFECT_DB_NAME}
-          PREFECT_DB_USER=${PREFECT_DB_USER}
-          PREFECT_DB_PASSWORD=${PREFECT_DB_PASSWORD}
-          OLLAMA_HOST=${OLLAMA_HOST}
-          EAR_ENDPOINT=${EAR_ENDPOINT}
-          BRAIN_ENDPOINT=${BRAIN_ENDPOINT}
-          COURIER_ENDPOINT=${COURIER_ENDPOINT}
-          PAP_STORAGE_ROOT=${PAP_STORAGE_ROOT}
-          WATCHER_API_KEY=${WATCHER_API_KEY}
-          EAR_API_KEY=${EAR_API_KEY}
-          BRAIN_API_KEY=${BRAIN_API_KEY}
-          COURIER_API_KEY=${COURIER_API_KEY}
-          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-          TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-          EOF
-
-      - name: Pull and restart staging tier1
-        env:
-          IMAGE_TAG: ${{ github.sha }}-staging
-        run: |
-          set -euo pipefail
-          compose_file="docker/staging/tier1.yml"
-          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
-          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
-
-      - name: Health checks (tier1 services)
-        run: |
-          for i in {1..12}; do
-            if curl -fs http://192.168.2.81:8200/health; then
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "Courier service failed to become healthy" >&2
-          exit 1
-
-      - name: Cleanup env copy
-        if: always()
-        run: rm -f .env
-
-  deploy-staging-tier2:
-    name: Deploy staging tier2
-    runs-on: [self-hosted, mid-node-01]
-    needs: build-and-push
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Generate staging environment file
-        run: |
-          cat <<EOF > .env
-          PREFECT_API_URL=${PREFECT_API_URL}
-          PREFECT_SERVER_API_URL=${PREFECT_SERVER_API_URL}
-          PREFECT_UI_URL=${PREFECT_UI_URL}
-          PREFECT_UI_API_URL=${PREFECT_UI_API_URL}
-          PREFECT_DB_NAME=${PREFECT_DB_NAME}
-          PREFECT_DB_USER=${PREFECT_DB_USER}
-          PREFECT_DB_PASSWORD=${PREFECT_DB_PASSWORD}
-          OLLAMA_HOST=${OLLAMA_HOST}
-          EAR_ENDPOINT=${EAR_ENDPOINT}
-          BRAIN_ENDPOINT=${BRAIN_ENDPOINT}
-          COURIER_ENDPOINT=${COURIER_ENDPOINT}
-          PAP_STORAGE_ROOT=${PAP_STORAGE_ROOT}
-          WATCHER_API_KEY=${WATCHER_API_KEY}
-          EAR_API_KEY=${EAR_API_KEY}
-          BRAIN_API_KEY=${BRAIN_API_KEY}
-          COURIER_API_KEY=${COURIER_API_KEY}
-          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-          TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-          EOF
-
-      - name: Pull and restart staging tier2
-        env:
-          IMAGE_TAG: ${{ github.sha }}-staging
-        run: |
-          set -euo pipefail
-          compose_file="docker/staging/tier2.yml"
-          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
-          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
-
-      - name: Cleanup env copy
-        if: always()
-        run: rm -f .env
-
-  deploy-staging-tier3:
-    name: Deploy staging tier3
-    runs-on: [self-hosted, ai-node-01]
-    needs:
-      - build-and-push
-      - deploy-staging-tier1
-      - deploy-staging-tier2
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Generate staging environment file
-        run: |
-          cat <<EOF > .env
-          PREFECT_API_URL=${PREFECT_API_URL}
-          PREFECT_SERVER_API_URL=${PREFECT_SERVER_API_URL}
-          PREFECT_UI_URL=${PREFECT_UI_URL}
-          PREFECT_UI_API_URL=${PREFECT_UI_API_URL}
-          PREFECT_DB_NAME=${PREFECT_DB_NAME}
-          PREFECT_DB_USER=${PREFECT_DB_USER}
-          PREFECT_DB_PASSWORD=${PREFECT_DB_PASSWORD}
-          OLLAMA_HOST=${OLLAMA_HOST}
-          EAR_ENDPOINT=${EAR_ENDPOINT}
-          BRAIN_ENDPOINT=${BRAIN_ENDPOINT}
-          COURIER_ENDPOINT=${COURIER_ENDPOINT}
-          PAP_STORAGE_ROOT=${PAP_STORAGE_ROOT}
-          WATCHER_API_KEY=${WATCHER_API_KEY}
-          EAR_API_KEY=${EAR_API_KEY}
-          BRAIN_API_KEY=${BRAIN_API_KEY}
-          COURIER_API_KEY=${COURIER_API_KEY}
-          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-          TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-          EOF
-
-      - name: Pull and restart staging tier3
-        env:
-          IMAGE_TAG: ${{ github.sha }}-staging
-        run: |
-          set -euo pipefail
-          compose_file="docker/staging/tier3.yml"
-          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
-          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
-
-      - name: Health checks (tier3 services)
-        run: |
-          curl --retry 5 --retry-all-errors --retry-delay 5 http://127.0.0.1:8000/health
-          curl --retry 5 --retry-all-errors --retry-delay 5 http://127.0.0.1:8100/health
-
-      - name: Cleanup env copy
-        if: always()
-        run: rm -f .env
-
-  deploy-prod:
-    name: Promote to production
-    runs-on: [self-hosted, etl-node-01]
-    needs: build-and-push
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.promote_prod == 'true'
-    environment:
-      name: production
-      url: http://192.168.2.81:4200/
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Promote images to latest
-        run: |
-          set -euo pipefail
-          for service in $SERVICES; do
-            docker pull ${REGISTRY}/${service}:${GITHUB_SHA}
-            docker tag ${REGISTRY}/${service}:${GITHUB_SHA} ${REGISTRY}/${service}:latest
-            docker push ${REGISTRY}/${service}:latest
-          done
 
       - name: Generate production environment file
         run: |
@@ -307,24 +107,141 @@ jobs:
           TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
           EOF
 
-      - name: Pull and restart production tiers
+      - name: Pull and restart prod tier1
         env:
-          IMAGE_TAG: latest
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           set -euo pipefail
-          for tier in tier1 tier2 tier3; do
-            compose_file="docker/prod/${tier}.yml"
-            if [ -f "$compose_file" ]; then
-              IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
-              IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
-            fi
-          done
+          compose_file="docker/prod/tier1.yml"
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
 
-      - name: Production health checks
+      - name: Health checks (tier1 services)
         run: |
-          curl --retry 5 --retry-all-errors --retry-delay 5 http://192.168.2.81:8200/health
-          curl --retry 5 --retry-all-errors --retry-delay 5 http://192.168.2.82:8000/health
-          curl --retry 5 --retry-all-errors --retry-delay 5 http://192.168.2.82:8100/health
+          for i in {1..12}; do
+            if curl -fs http://192.168.2.81:8200/health; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Courier service failed to become healthy" >&2
+          exit 1
+
+      - name: Cleanup env copy
+        if: always()
+        run: rm -f .env
+
+  deploy-prod-tier2:
+    name: Deploy prod tier2
+    runs-on: [self-hosted, mid-node-01]
+    needs: build-and-push
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Generate production environment file
+        run: |
+          cat <<EOF > .env
+          PREFECT_API_URL=${PREFECT_API_URL}
+          PREFECT_SERVER_API_URL=${PREFECT_SERVER_API_URL}
+          PREFECT_UI_URL=${PREFECT_UI_URL}
+          PREFECT_UI_API_URL=${PREFECT_UI_API_URL}
+          PREFECT_DB_NAME=${PREFECT_DB_NAME}
+          PREFECT_DB_USER=${PREFECT_DB_USER}
+          PREFECT_DB_PASSWORD=${PREFECT_DB_PASSWORD}
+          OLLAMA_HOST=${OLLAMA_HOST}
+          EAR_ENDPOINT=${EAR_ENDPOINT}
+          BRAIN_ENDPOINT=${BRAIN_ENDPOINT}
+          COURIER_ENDPOINT=${COURIER_ENDPOINT}
+          PAP_STORAGE_ROOT=${PAP_STORAGE_ROOT}
+          WATCHER_API_KEY=${WATCHER_API_KEY}
+          EAR_API_KEY=${EAR_API_KEY}
+          BRAIN_API_KEY=${BRAIN_API_KEY}
+          COURIER_API_KEY=${COURIER_API_KEY}
+          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+          TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+          EOF
+
+      - name: Pull and restart prod tier2
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          compose_file="docker/prod/tier2.yml"
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
+
+      - name: Cleanup env copy
+        if: always()
+        run: rm -f .env
+
+  deploy-prod-tier3:
+    name: Deploy prod tier3
+    runs-on: [self-hosted, ai-node-01]
+    needs:
+      - build-and-push
+      - deploy-prod-tier1
+      - deploy-prod-tier2
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Generate production environment file
+        run: |
+          cat <<EOF > .env
+          PREFECT_API_URL=${PREFECT_API_URL}
+          PREFECT_SERVER_API_URL=${PREFECT_SERVER_API_URL}
+          PREFECT_UI_URL=${PREFECT_UI_URL}
+          PREFECT_UI_API_URL=${PREFECT_UI_API_URL}
+          PREFECT_DB_NAME=${PREFECT_DB_NAME}
+          PREFECT_DB_USER=${PREFECT_DB_USER}
+          PREFECT_DB_PASSWORD=${PREFECT_DB_PASSWORD}
+          OLLAMA_HOST=${OLLAMA_HOST}
+          EAR_ENDPOINT=${EAR_ENDPOINT}
+          BRAIN_ENDPOINT=${BRAIN_ENDPOINT}
+          COURIER_ENDPOINT=${COURIER_ENDPOINT}
+          PAP_STORAGE_ROOT=${PAP_STORAGE_ROOT}
+          WATCHER_API_KEY=${WATCHER_API_KEY}
+          EAR_API_KEY=${EAR_API_KEY}
+          BRAIN_API_KEY=${BRAIN_API_KEY}
+          COURIER_API_KEY=${COURIER_API_KEY}
+          TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+          TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+          EOF
+
+      - name: Pull and restart prod tier3
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          compose_file="docker/prod/tier3.yml"
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
+
+      - name: Health checks (tier3 services)
+        run: |
+          curl --retry 5 --retry-all-errors --retry-delay 5 http://127.0.0.1:8000/health
+          curl --retry 5 --retry-all-errors --retry-delay 5 http://127.0.0.1:8100/health
 
       - name: Cleanup env copy
         if: always()

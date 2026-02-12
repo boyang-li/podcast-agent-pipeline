@@ -11,7 +11,7 @@
 - **Hardware:** Apple Silicon M4 (24 GB RAM)
 - **Role:** Authoring, unit testing, container builds (developer laptop)
 - **Execution Mode:** Docker Desktop with CPU-only mocks (no GPU passthrough)
-- **Workflow:** Build & test locally → push to Git → CI deploys to staging/production
+- **Workflow:** Build & test locally → push to Git → CI deploys to production
 
 ### Tier 1 — Gateway & Ingestion (`etl-node-01`, 192.168.2.81)
 - **Hardware:** Trigkey Mini PC (Intel Tiger Lake i5)
@@ -76,7 +76,7 @@ All three tier nodes connect via a dedicated 2.5 Gbps Ethernet switch uplinked
 ### Containerized Execution Model
 - All agents run as Docker containers; no bare-metal Python processes in production.
 - Local development uses Docker Compose on MBP with CPU-only mocks for GPU services.
-- Production/staging deployments run Docker Compose stacks per tier:
+- Production deployments run Docker Compose stacks per tier:
   - `etl-node-01` (Tier 1): watcher, courier, Redpanda, Prefect server/worker
   - `mid-node-01` (Tier 2): metadata/tagging microservices, Qdrant, lightweight inference workers, GitHub runner
   - `gpu-node-01` (Tier 3): ear (faster-whisper) + brain (LLM) with GPU passthrough (`--device=/dev/kfd --device=/dev/dri --group-add video`)
@@ -89,14 +89,11 @@ All three tier nodes connect via a dedicated 2.5 Gbps Ethernet switch uplinked
 - **Runner:** Self-hosted GitHub Actions runner on `etl-node-01`
 - **Local Dev:** MBP M4 builds + tests via Docker Compose (CPU mocks). No production data processed locally.
 - **Testing:** `pytest` covers Watcher/Ear/Brain/Courier modules and a mocked Prefect flow; set `PAP_STORAGE_ROOT` + sandbox `.env` to avoid touching `/srv`. Telegram/yt-dlp/Ollama calls are monkeypatched in tests.
-- **Current Staging Status:** Tier 1 stack (Prefect server/worker, Redpanda, Watcher, Courier placeholder) is running on `etl-node-01`. Watcher successfully downloaded All-In YouTube episodes into `/srv/pap/raw`. Prefect UI reachable at `http://192.168.2.81:4200/`. Tier 2/3 to be deployed next.
+- **Current Production Status:** Tier 1 stack (Prefect server/worker, Redpanda, Watcher, Courier) runs on `etl-node-01`, Tier 2 services on `mid-node-01`, and GPU agents on `gpu-node-01`. Prefect UI is reachable at `http://192.168.2.81:4200/`.
 - **Flow:**
   1. Developer verifies changes locally in containers (unit tests, lint, mock flows).
-  2. `git push` triggers GitHub Action on `etl-node-01` (staging pipeline).
-  3. Action builds multi-arch Docker images (arm64 for dev, x86_64 for deployment) and pushes to GHCR/local registry.
-  4. Post-build job deploys to **staging stack** on both nodes (Docker Compose pull/up).
-  5. Automated staging runs execute Prefect test flows; Oracle agent reviews results.
-  6. On approval, same images are promoted to **production stack** (compose pull/up) with health checks (Prefect, `rocminfo`, `ollama ps`).
+  2. `git push` triggers the GitHub Actions pipeline on `etl-node-01`.
+  3. The action builds multi-arch Docker images, pushes them to GHCR, and automatically redeploys the production tiers (compose pull/up + health checks).
 
 ---
 
@@ -156,9 +153,9 @@ All three tier nodes connect via a dedicated 2.5 Gbps Ethernet switch uplinked
 | Ollama Server | `ai-node-01` | Official `ollama/ollama` image | Serves qwen2.5 models |
 
 ### Local Compose (MBP)
-- Uses same containers where possible but swaps GPU-dependent ones with CPU mocks.
+- Uses the same containers where possible but swaps GPU-dependent ones with CPU mocks.
 - Volumes map to `./data` directories to simulate NFS.
-- Provides a “staging-lite” environment to catch obvious regressions.
+- Provides a “prod-lite” environment to catch obvious regressions.
 
 ---
 
@@ -167,17 +164,10 @@ All three tier nodes connect via a dedicated 2.5 Gbps Ethernet switch uplinked
 1. **Local Build/Test (MBP):**
    - Run `docker compose -f docker-compose.local.yaml up` for Watcher + Prefect + mocks.
    - Execute unit/integration tests inside containers.
-2. **CI Build (GitHub Actions on `etl-node-01`):**
-   - Build multi-arch images via `docker buildx bake`.
-   - Push images to GitHub Container Registry (`ghcr.io/boyang-li/pap/<service>:<sha>`).
-3. **Staging Deployment:**
-   - Compose files `docker-compose.staging.yml` on both nodes pull `<sha>-staging` tags.
-   - Prefect runs test flows end-to-end; Oracle reviews logs/results.
-4. **Production Deployment:**
-   - Promote tested images by re-tagging `<sha>` → `latest`.
-   - Compose stacks restarted with health checks + Telegram notifications.
+2. **CI Build & Deploy (GitHub Actions on `etl-node-01`):**
+   - Build multi-arch images via `docker buildx bake` and push to GHCR (`ghcr.io/boyang-li/pap/<service>:<sha>` and `:latest`).
+   - Redeploy production tiers automatically (compose pull/up on tier1–tier3 nodes) with health checks + Telegram notifications.
 
 ### Automation Responsibilities
-- **You (developer):** Build/test locally, push to Git.
-- **CI (self-hosted runner):** Build images, deploy to staging, run tests, ping Oracle for review.
-- **Oracle Agent:** Reviews staging results, authorizes production promotion.
+- **You (developer):** Build/test locally, push to `main`.
+- **CI (self-hosted runner):** Build images and deploy them to production on every push.

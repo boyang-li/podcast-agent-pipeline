@@ -45,44 +45,37 @@ Prefect-orchestrated home lab workflow that ingests podcast feeds (RSS + YouTube
 ## Development & Deployment Workflow
 1. **Develop locally** using Docker Desktop + `docker/docker-compose.local.yml`. GPU-heavy agents run as CPU mocks; focus on unit tests and integration flows without hardware dependencies.
 2. **Push to GitHub** only after local checks pass.
-3. **Self-hosted GitHub Action on `etl-node-01`** builds multi-arch Docker images, pushes to GHCR/local registry, and deploys to staging stacks across Tier 1–3.
-4. **Staging verification** runs Prefect flows end-to-end on real hardware; Oracle agent reviews logs/results.
-5. **Promote to production** by reusing the tested images (compose pull/up) with health checks + Telegram alerts.
+3. **Self-hosted GitHub Action on `etl-node-01`** builds multi-arch Docker images, pushes to GHCR, and deploys directly to the production stacks (Tier 1–3). Every push to `main` redeploys live services.
+4. **Production verification** happens immediately after the workflow finishes—Prefect flows run on real hardware and Telegram alerts confirm success.
 
 ### Cluster Deployment Cheatsheet
+When manual intervention is required (rare), restart the production stacks only:
+
 ```bash
 # Tier 1 (etl-node-01)
-docker compose -f docker/staging/tier1.yml up -d --remove-orphans
+IMAGE_TAG=latest docker compose -f docker/prod/tier1.yml up -d --pull always --remove-orphans
 
 # Tier 2 (mid-node-01)
-docker compose -f docker/staging/tier2.yml up -d --remove-orphans
+IMAGE_TAG=latest docker compose -f docker/prod/tier2.yml up -d --pull always --remove-orphans
 
-# Tier 3 (gpu-node-01) – run after 19:00 off-peak wake
-docker compose -f docker/staging/tier3.yml up -d --remove-orphans
-
-# Production rollout after staging sign-off
-IMAGE_TAG=latest docker compose -f docker/prod/tier1.yml up -d --pull always
-IMAGE_TAG=latest docker compose -f docker/prod/tier2.yml up -d --pull always
-IMAGE_TAG=latest docker compose -f docker/prod/tier3.yml up -d --pull always
+# Tier 3 (gpu-node-01)
+IMAGE_TAG=latest docker compose -f docker/prod/tier3.yml up -d --pull always --remove-orphans
 ```
 
-> **Note:** staging stacks default to `IMAGE_TAG=staging`; production uses `IMAGE_TAG=latest`. Override by exporting `IMAGE_TAG` before running compose commands.
+> **Note:** GitHub Actions normally handles these commands automatically; use the cheat sheet only for break-glass situations.
 
 ### Service Shutdown/Startup Commands
 Run these from your MBP (SSH into each node):
 
 ```bash
 # Tier 1 (etl-node-01, Prefect + Watcher + Courier)
-ssh bli@192.168.2.81 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier1.yml down'
-ssh bli@192.168.2.81 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier1.yml up -d --remove-orphans'
+ssh bli@192.168.2.81 'cd /home/bli/actions-runner/_work/podcast-agent-pipeline/podcast-agent-pipeline && IMAGE_TAG=latest docker compose -f docker/prod/tier1.yml down && IMAGE_TAG=latest docker compose -f docker/prod/tier1.yml up -d --remove-orphans'
 
 # Tier 2 (mid-node-01, Qdrant + Prefect logic worker)
-ssh bli@192.168.2.83 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier2.yml down'
-ssh bli@192.168.2.83 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier2.yml up -d --remove-orphans'
+ssh bli@192.168.2.83 'cd /home/bli/actions-runner/_work/podcast-agent-pipeline/podcast-agent-pipeline && IMAGE_TAG=latest docker compose -f docker/prod/tier2.yml down && IMAGE_TAG=latest docker compose -f docker/prod/tier2.yml up -d --remove-orphans'
 
-# (future) Tier 3 (gpu-node-01)
-ssh bli@192.168.2.82 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier3.yml down'
-ssh bli@192.168.2.82 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier3.yml up -d --remove-orphans'
+# Tier 3 (gpu-node-01)
+ssh bli@192.168.2.82 'cd /home/bli/actions-runner/_work/podcast-agent-pipeline/podcast-agent-pipeline && IMAGE_TAG=latest docker compose -f docker/prod/tier3.yml down && IMAGE_TAG=latest docker compose -f docker/prod/tier3.yml up -d --remove-orphans'
 ```
 
 ## Testing & Local Validation
@@ -93,7 +86,7 @@ ssh bli@192.168.2.82 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging do
 | Watcher CLI smoke | `python -m watcher.main --config config/feeds.yaml` | Set `PAP_STORAGE_ROOT` to a temp directory; when Prefect workers aren’t running, tasks fall back to synchronous execution |
 | Ear FastAPI | `uvicorn ear.api:app --reload` (then POST to `/transcribe`) | CPU-only stub returning deterministic segments |
 | Prefect flow dry-run | `python -m flows.pipeline https://example.com feed guid123 ./output/%(ext)s` | Exercises end-to-end pipeline with download/Telegram mocked; relies on `.env` defaults |
-| Staging Tier 1 smoke | `ssh bli@192.168.2.81 docker logs -f staging-watcher-1` | Confirms watcher flow downloads YouTube audio into `/srv/pap/raw` and records ledger entries. Prefect UI reachable at `http://192.168.2.81:4200/`. |
+| Prod Tier 1 logs | `ssh bli@192.168.2.81 docker logs -f prod-watcher-1` | Confirms watcher flow downloads YouTube audio into `/srv/pap/raw` and records ledger entries. Prefect UI reachable at `http://192.168.2.81:4200/`. |
 
 Stick with these local validations until YouTube/Telegram credentials and GPU services are ready for staging deployment.
 
