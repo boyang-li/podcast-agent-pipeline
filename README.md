@@ -68,6 +68,23 @@ IMAGE_TAG=latest docker compose -f docker/prod/tier3.yml up -d --pull always
 
 > **Note:** staging stacks default to `IMAGE_TAG=staging`; production uses `IMAGE_TAG=latest`. Override by exporting `IMAGE_TAG` before running compose commands.
 
+### Service Shutdown/Startup Commands
+Run these from your MBP (SSH into each node):
+
+```bash
+# Tier 1 (etl-node-01, Prefect + Watcher + Courier)
+ssh bli@192.168.2.81 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier1.yml down'
+ssh bli@192.168.2.81 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier1.yml up -d --remove-orphans'
+
+# Tier 2 (mid-node-01, Qdrant + Prefect logic worker)
+ssh bli@192.168.2.83 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier2.yml down'
+ssh bli@192.168.2.83 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier2.yml up -d --remove-orphans'
+
+# (future) Tier 3 (gpu-node-01)
+ssh bli@192.168.2.82 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier3.yml down'
+ssh bli@192.168.2.82 'cd /opt/pap/podcast-agent-pipeline && IMAGE_TAG=staging docker compose -f docker/staging/tier3.yml up -d --remove-orphans'
+```
+
 ## Testing & Local Validation
 
 | Scope | Command | Notes |
