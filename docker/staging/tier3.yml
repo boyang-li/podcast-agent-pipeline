@@ -10,40 +10,36 @@ services:
     command: ["prefect", "worker", "start", "--pool", "gpu", "--name", "staging-tier3"]
 
   ear:
-    image: ear:${IMAGE_TAG-staging}
-    build:
-      context: ../..
-      dockerfile: docker/Dockerfile.ear
+    image: ghcr.io/boyang-li/pap/ear:${IMAGE_TAG-staging}
     env_file:
       - ../../.env
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
+    environment:
+      HSA_OVERRIDE_GFX_VERSION: "11.0.1"
+      PAP_STORAGE_ROOT: ${PAP_STORAGE_ROOT-/srv/pap}
     devices:
       - "/dev/kfd:/dev/kfd"
       - "/dev/dri:/dev/dri"
     group_add:
       - video
-    environment:
-      HSA_OVERRIDE_GFX_VERSION: "11.0.1"
     volumes:
-      - /srv/pap/raw:/srv/pap/raw:ro
-      - /srv/pap/transcripts:/srv/pap/transcripts
+      - ${PAP_STORAGE_ROOT-/srv/pap}/raw:/data/raw:ro
+      - ${PAP_STORAGE_ROOT-/srv/pap}/transcripts:/data/transcripts
+    ports:
+      - "8000:8000"
 
   brain:
-    image: brain:${IMAGE_TAG-staging}
-    build:
-      context: ../..
-      dockerfile: docker/Dockerfile.brain
+    image: ghcr.io/boyang-li/pap/brain:${IMAGE_TAG-staging}
     env_file:
       - ../../.env
+    environment:
+      PAP_STORAGE_ROOT: ${PAP_STORAGE_ROOT-/srv/pap}
     depends_on:
       - ear
     volumes:
-      - /srv/pap/transcripts:/srv/pap/transcripts:ro
-      - /srv/pap/summaries:/srv/pap/summaries
+      - ${PAP_STORAGE_ROOT-/srv/pap}/transcripts:/data/transcripts:ro
+      - ${PAP_STORAGE_ROOT-/srv/pap}/summaries:/data/summaries
+    ports:
+      - "8100:8100"
 
   ollama:
     image: ollama/ollama:0.1.32

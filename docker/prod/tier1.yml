@@ -63,10 +63,7 @@ services:
     restart: unless-stopped
 
   watcher:
-    image: watcher:${IMAGE_TAG-latest}
-    build:
-      context: ../..
-      dockerfile: docker/Dockerfile.watcher
+    image: ghcr.io/boyang-li/pap/watcher:${IMAGE_TAG-latest}
     env_file:
       - ../../.env
     depends_on:
@@ -77,10 +74,7 @@ services:
     restart: unless-stopped
 
   courier:
-    image: courier:${IMAGE_TAG-latest}
-    build:
-      context: ../..
-      dockerfile: docker/Dockerfile.courier
+    image: ghcr.io/boyang-li/pap/courier:${IMAGE_TAG-latest}
     env_file:
       - ../../.env
     depends_on:
@@ -88,6 +82,8 @@ services:
     volumes:
       - /srv/pap/summaries:/srv/pap/summaries
     restart: unless-stopped
+    ports:
+      - "8200:8200"
 
 volumes:
   prefect-db-data:
