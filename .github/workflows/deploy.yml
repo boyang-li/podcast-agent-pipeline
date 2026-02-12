@@ -15,6 +15,22 @@ on:
 env:
   REGISTRY: ghcr.io/boyang-li/pap
   SERVICES: watcher courier ear brain
+  PREFECT_API_URL: ${{ vars.PREFECT_API_URL }}
+  PREFECT_SERVER_API_URL: ${{ vars.PREFECT_SERVER_API_URL }}
+  PREFECT_UI_URL: ${{ vars.PREFECT_UI_URL }}
+  PREFECT_UI_API_URL: ${{ vars.PREFECT_UI_API_URL }}
+  PREFECT_DB_NAME: ${{ vars.PREFECT_DB_NAME }}
+  PREFECT_DB_USER: ${{ vars.PREFECT_DB_USER }}
+  PREFECT_DB_PASSWORD: ${{ vars.PREFECT_DB_PASSWORD }}
+  OLLAMA_HOST: ${{ vars.OLLAMA_HOST }}
+  EAR_ENDPOINT: ${{ vars.EAR_ENDPOINT }}
+  BRAIN_ENDPOINT: ${{ vars.BRAIN_ENDPOINT }}
+  COURIER_ENDPOINT: ${{ vars.COURIER_ENDPOINT }}
+  PAP_STORAGE_ROOT: ${{ vars.PAP_STORAGE_ROOT }}
+  WATCHER_API_KEY: ${{ vars.WATCHER_API_KEY }}
+  EAR_API_KEY: ${{ vars.EAR_API_KEY }}
+  BRAIN_API_KEY: ${{ vars.BRAIN_API_KEY }}
+  COURIER_API_KEY: ${{ vars.COURIER_API_KEY }}
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -54,8 +70,8 @@ jobs:
               .
           done
 
-  deploy-staging-tier12:
-    name: Deploy staging tier1/tier2
+  deploy-staging-tier1:
+    name: Deploy staging tier1
     runs-on: [self-hosted, etl-node-01]
     needs: build-and-push
     permissions:
@@ -72,22 +88,35 @@ jobs:
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Copy staging environment file
+      - name: Generate staging environment file
         run: |
-          cp /opt/pap/podcast-agent-pipeline/.env .env
+          cat <<EOF > .env
+          PREFECT_API_URL=${PREFECT_API_URL}
+          PREFECT_SERVER_API_URL=${PREFECT_SERVER_API_URL}
+          PREFECT_UI_URL=${PREFECT_UI_URL}
+          PREFECT_UI_API_URL=${PREFECT_UI_API_URL}
+          PREFECT_DB_NAME=${PREFECT_DB_NAME}
+          PREFECT_DB_USER=${PREFECT_DB_USER}
+          PREFECT_DB_PASSWORD=${PREFECT_DB_PASSWORD}
+          OLLAMA_HOST=${OLLAMA_HOST}
+          EAR_ENDPOINT=${EAR_ENDPOINT}
+          BRAIN_ENDPOINT=${BRAIN_ENDPOINT}
+          COURIER_ENDPOINT=${COURIER_ENDPOINT}
+          PAP_STORAGE_ROOT=${PAP_STORAGE_ROOT}
+          WATCHER_API_KEY=${WATCHER_API_KEY}
+          EAR_API_KEY=${EAR_API_KEY}
+          BRAIN_API_KEY=${BRAIN_API_KEY}
+          COURIER_API_KEY=${COURIER_API_KEY}
+          EOF
 
-      - name: Pull and restart staging tiers (tier1 & tier2)
+      - name: Pull and restart staging tier1
         env:
           IMAGE_TAG: ${{ github.sha }}-staging
         run: |
           set -euo pipefail
-          for tier in tier1 tier2; do
-            compose_file="docker/staging/${tier}.yml"
-            if [ -f "$compose_file" ]; then
-              IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
-              IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
-            fi
-          done
+          compose_file="docker/staging/tier1.yml"
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
 
       - name: Health checks (tier1 services)
         run: |
@@ -104,12 +133,10 @@ jobs:
         if: always()
         run: rm -f .env
 
-  deploy-staging-tier3:
-    name: Deploy staging tier3
-    runs-on: [self-hosted, ai-node-01]
-    needs:
-      - build-and-push
-      - deploy-staging-tier12
+  deploy-staging-tier2:
+    name: Deploy staging tier2
+    runs-on: [self-hosted, mid-node-01]
+    needs: build-and-push
     permissions:
       contents: read
       packages: read
@@ -124,9 +151,81 @@ jobs:
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Copy staging environment file
+      - name: Generate staging environment file
         run: |
-          cp /opt/pap/podcast-agent-pipeline/.env .env
+          cat <<EOF > .env
+          PREFECT_API_URL=${PREFECT_API_URL}
+          PREFECT_SERVER_API_URL=${PREFECT_SERVER_API_URL}
+          PREFECT_UI_URL=${PREFECT_UI_URL}
+          PREFECT_UI_API_URL=${PREFECT_UI_API_URL}
+          PREFECT_DB_NAME=${PREFECT_DB_NAME}
+          PREFECT_DB_USER=${PREFECT_DB_USER}
+          PREFECT_DB_PASSWORD=${PREFECT_DB_PASSWORD}
+          OLLAMA_HOST=${OLLAMA_HOST}
+          EAR_ENDPOINT=${EAR_ENDPOINT}
+          BRAIN_ENDPOINT=${BRAIN_ENDPOINT}
+          COURIER_ENDPOINT=${COURIER_ENDPOINT}
+          PAP_STORAGE_ROOT=${PAP_STORAGE_ROOT}
+          WATCHER_API_KEY=${WATCHER_API_KEY}
+          EAR_API_KEY=${EAR_API_KEY}
+          BRAIN_API_KEY=${BRAIN_API_KEY}
+          COURIER_API_KEY=${COURIER_API_KEY}
+          EOF
+
+      - name: Pull and restart staging tier2
+        env:
+          IMAGE_TAG: ${{ github.sha }}-staging
+        run: |
+          set -euo pipefail
+          compose_file="docker/staging/tier2.yml"
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" pull
+          IMAGE_TAG=${IMAGE_TAG} docker compose -f "$compose_file" up -d --remove-orphans
+
+      - name: Cleanup env copy
+        if: always()
+        run: rm -f .env
+
+  deploy-staging-tier3:
+    name: Deploy staging tier3
+    runs-on: [self-hosted, ai-node-01]
+    needs:
+      - build-and-push
+      - deploy-staging-tier1
+      - deploy-staging-tier2
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Generate staging environment file
+        run: |
+          cat <<EOF > .env
+          PREFECT_API_URL=${PREFECT_API_URL}
+          PREFECT_SERVER_API_URL=${PREFECT_SERVER_API_URL}
+          PREFECT_UI_URL=${PREFECT_UI_URL}
+          PREFECT_UI_API_URL=${PREFECT_UI_API_URL}
+          PREFECT_DB_NAME=${PREFECT_DB_NAME}
+          PREFECT_DB_USER=${PREFECT_DB_USER}
+          PREFECT_DB_PASSWORD=${PREFECT_DB_PASSWORD}
+          OLLAMA_HOST=${OLLAMA_HOST}
+          EAR_ENDPOINT=${EAR_ENDPOINT}
+          BRAIN_ENDPOINT=${BRAIN_ENDPOINT}
+          COURIER_ENDPOINT=${COURIER_ENDPOINT}
+          PAP_STORAGE_ROOT=${PAP_STORAGE_ROOT}
+          WATCHER_API_KEY=${WATCHER_API_KEY}
+          EAR_API_KEY=${EAR_API_KEY}
+          BRAIN_API_KEY=${BRAIN_API_KEY}
+          COURIER_API_KEY=${COURIER_API_KEY}
+          EOF
 
       - name: Pull and restart staging tier3
         env:
@@ -177,9 +276,26 @@ jobs:
             docker push ${REGISTRY}/${service}:latest
           done
 
-      - name: Copy production environment file
+      - name: Generate production environment file
         run: |
-          cp /opt/pap/podcast-agent-pipeline/.env .env
+          cat <<EOF > .env
+          PREFECT_API_URL=${PREFECT_API_URL}
+          PREFECT_SERVER_API_URL=${PREFECT_SERVER_API_URL}
+          PREFECT_UI_URL=${PREFECT_UI_URL}
+          PREFECT_UI_API_URL=${PREFECT_UI_API_URL}
+          PREFECT_DB_NAME=${PREFECT_DB_NAME}
+          PREFECT_DB_USER=${PREFECT_DB_USER}
+          PREFECT_DB_PASSWORD=${PREFECT_DB_PASSWORD}
+          OLLAMA_HOST=${OLLAMA_HOST}
+          EAR_ENDPOINT=${EAR_ENDPOINT}
+          BRAIN_ENDPOINT=${BRAIN_ENDPOINT}
+          COURIER_ENDPOINT=${COURIER_ENDPOINT}
+          PAP_STORAGE_ROOT=${PAP_STORAGE_ROOT}
+          WATCHER_API_KEY=${WATCHER_API_KEY}
+          EAR_API_KEY=${EAR_API_KEY}
+          BRAIN_API_KEY=${BRAIN_API_KEY}
+          COURIER_API_KEY=${COURIER_API_KEY}
+          EOF
 
       - name: Pull and restart production tiers
         env:
