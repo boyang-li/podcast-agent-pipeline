@@ -8,27 +8,16 @@ services:
       - /srv/pap/vector_backups:/backups
     ports:
       - "6333:6333"
-
-  metadata-worker:
-    image: metadata:${IMAGE_TAG-latest}
-    build:
-      context: ../..
-      dockerfile: docker/Dockerfile.metadata
-    env_file:
-      - ../../.env
-    volumes:
-      - /srv/pap/raw:/srv/pap/raw:ro
-      - /srv/pap/meta:/srv/pap/meta
-    depends_on:
-      - qdrant
+    restart: unless-stopped
 
   prefect-worker-logic:
-    image: prefecthq/prefect:2-python3.11
+    image: prefecthq/prefect:3-python3.12
     env_file:
       - ../../.env
     environment:
-      PREFECT_API_URL: http://192.168.2.81:4200/api
+      PREFECT_API_URL: ${PREFECT_API_URL-http://192.168.2.81:4200/api}
     command: ["prefect", "worker", "start", "--pool", "logic", "--name", "prod-tier2"]
+    restart: unless-stopped
 
 volumes:
   qdrant-data:
