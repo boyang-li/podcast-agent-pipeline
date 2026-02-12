@@ -1,6 +1,6 @@
 youtube:
-  - channel_id: UCtMVHI3AJD4Qk4hcbZnI9ZQ  # All-In Podcast
-    channel_name: all-in
+  - channel_id: UCESLZhusAkFfsNsApnjF_Cg # All-In Podcast (@allin)
+    channel_name: "allin"
     poll_interval_minutes: 60
 
 rss: []
