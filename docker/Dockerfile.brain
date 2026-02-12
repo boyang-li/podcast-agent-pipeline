@@ -5,8 +5,10 @@ WORKDIR /app
 COPY pyproject.toml README.md /app/
 COPY src /app/src
 
-RUN pip install --upgrade pip && pip install .[dev]
+RUN pip install --upgrade pip && pip install .[dev] && pip install httpx
 
 ENV PYTHONPATH=/app/src
 
-ENTRYPOINT ["python", "-m", "brain.analyzer"]
+EXPOSE 8100
+
+ENTRYPOINT ["uvicorn", "brain.api:app", "--host", "0.0.0.0", "--port", "8100"]

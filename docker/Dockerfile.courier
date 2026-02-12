@@ -9,4 +9,6 @@ RUN pip install --upgrade pip && pip install .[dev]
 
 ENV PYTHONPATH=/app/src
 
-ENTRYPOINT ["python", "-m", "courier.service"]
+EXPOSE 8200
+
+ENTRYPOINT ["uvicorn", "courier.api:app", "--host", "0.0.0.0", "--port", "8200"]
