@@ -1,8 +1,11 @@
-"""Primary Prefect flow wiring Watcher -> Ear -> Brain -> Courier."""
+"""Prefect flow for running Ear → Brain → Courier services."""
 
 from __future__ import annotations
 
-from pathlib import Path
+import os
+from typing import List
+
+import httpx
 
 try:
     from prefect import flow, task  # type: ignore
@@ -20,58 +23,81 @@ except ImportError:  # pragma: no cover
     def flow(func=None, **kwargs):
         return _identity_decorator(func, **kwargs)
 
-from brain.analyzer import BrainAnalyzer
-from courier.service import CourierService, send_summary_sync
-from ear.transcriber import TranscriptEngine
-from shared.config import Settings, load_settings
-from shared.paths import META_DIR
-from watcher.downloader import download_audio
-from watcher.ledger import DownloadLedger
+
+EAR_ENDPOINT = os.getenv("EAR_ENDPOINT", "http://192.168.2.82:8000")
+BRAIN_ENDPOINT = os.getenv("BRAIN_ENDPOINT", "http://192.168.2.82:8100")
+COURIER_ENDPOINT = os.getenv("COURIER_ENDPOINT", "http://192.168.2.81:8200")
 
 
-@task
-def download_task(url: str, feed_id: str, guid: str, template: str) -> str:
-    ledger = DownloadLedger(META_DIR / "downloads.db")
-    if ledger.has_guid(guid):
-        return str(template)
-    path = download_audio(url, template)
-    ledger.record(guid, feed_id, Path(path))
-    ledger.close()
-    return str(path)
+@task(name="request_transcript")
+def transcribe_task(episode_id: str, audio_path: str, language_hint: str | None = None) -> dict:
+    payload = {
+        "episode_id": episode_id,
+        "audio_path": audio_path,
+        "language_hint": language_hint,
+    }
+    with httpx.Client(timeout=300.0) as client:
+        resp = client.post(f"{EAR_ENDPOINT}/transcribe", json=payload)
+        resp.raise_for_status()
+        return resp.json()
 
 
-@task
-def transcribe_task(episode_id: str, audio_path: str) -> str:
-    engine = TranscriptEngine()
-    result = engine.transcribe(episode_id, audio_path)
-    return "\n".join(segment.text for segment in result.segments)
+@task(name="summarize_transcript")
+def analyze_task(episode_id: str, title: str, transcript_text: str) -> dict:
+    payload = {
+        "episode_id": episode_id,
+        "title": title,
+        "transcript": transcript_text,
+    }
+    with httpx.Client(timeout=300.0) as client:
+        resp = client.post(f"{BRAIN_ENDPOINT}/summarize", json=payload)
+        resp.raise_for_status()
+        return resp.json()
 
 
-@task
-def analyze_task(episode_id: str, transcript_text: str) -> dict:
-    analyzer = BrainAnalyzer()
-    result = analyzer.analyze(episode_id, transcript_text)
-    return result.model_dump()
+@task(name="notify_summary")
+def deliver_task(episode_id: str, title: str, thesis: str, topics: List[str], insights: List[str]) -> str:
+    payload = {
+        "episode_id": episode_id,
+        "title": title,
+        "thesis": thesis,
+        "topics": topics,
+        "insights": insights,
+    }
+    with httpx.Client(timeout=120.0) as client:
+        resp = client.post(f"{COURIER_ENDPOINT}/notify", json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+    return data.get("summary_path", "")
 
 
-@task
-def deliver_task(payload: dict, settings: Settings) -> str:
-    courier = CourierService(settings.storage, settings.telegram)
-    path = send_summary_sync(
-        courier,
-        payload["episode_id"],
-        title=payload.get("core_thesis", "Untitled Episode"),
-        thesis=payload.get("core_thesis", ""),
-        topics=[topic.get("title", "") for topic in payload.get("timestamped_topics", [])],
-        insights=payload.get("actionable_insights", []),
-    )
-    return str(path)
+def _segments_to_text(transcript: dict) -> str:
+    return "\n".join(seg.get("text", "") for seg in transcript.get("segments", []))
 
 
-@flow(name="podcast_agent_pipeline")
-def podcast_agent_pipeline(episode_url: str, feed_id: str, guid: str, template: str) -> str:
-    settings = load_settings()
-    audio_path = download_task(episode_url, feed_id, guid, template)
-    transcript_text = transcribe_task(guid, audio_path)
-    analysis = analyze_task(guid, transcript_text)
-    return deliver_task(analysis, settings)
+@flow(name="summarize_episode_flow")
+def summarize_episode_flow(
+    episode_id: str,
+    audio_path: str,
+    title: str,
+    language_hint: str | None = None,
+) -> str:
+    transcript = transcribe_task(episode_id, audio_path, language_hint)
+    analysis = analyze_task(episode_id, title, _segments_to_text(transcript))
+    thesis = analysis.get("core_thesis", title)
+    topics = [topic.get("title", "") for topic in analysis.get("timestamped_topics", [])]
+    insights = analysis.get("actionable_insights", [])
+    return deliver_task(episode_id, title, thesis, topics, insights)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Summarize a podcast episode")
+    parser.add_argument("episode_id", help="Unique episode identifier")
+    parser.add_argument("audio_path", help="Path to local audio file (mp3)")
+    parser.add_argument("title", help="Episode title")
+    parser.add_argument("--language", default=None, help="Optional language hint (e.g., en)")
+    args = parser.parse_args()
+
+    summarize_episode_flow(args.episode_id, args.audio_path, args.title, language_hint=args.language)

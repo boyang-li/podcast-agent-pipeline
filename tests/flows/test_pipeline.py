@@ -1,16 +1,25 @@
-from flows.pipeline import podcast_agent_pipeline
+from flows.pipeline import summarize_episode_flow
 
 
-def test_pipeline_flow(monkeypatch, tmp_path):
-    def mock_download(url, feed_id, guid, template):
-        file_path = tmp_path / f"{guid}.mp3"
-        file_path.write_text("audio")
-        return str(file_path)
+def test_summarize_episode_flow(monkeypatch):
+    monkeypatch.setattr(
+        "flows.pipeline.transcribe_task",
+        lambda episode_id, audio_path, language_hint=None: {"segments": [{"text": "Hello world"}]},
+    )
+    monkeypatch.setattr(
+        "flows.pipeline.analyze_task",
+        lambda episode_id, title, transcript_text: {
+            "episode_id": episode_id,
+            "core_thesis": "Test thesis",
+            "timestamped_topics": [],
+            "actionable_insights": ["insight"],
+        },
+    )
 
-    monkeypatch.setattr("flows.pipeline.download_task", mock_download)
-    async def fake_send_message(self, text, parse_mode=None):
-        return None
+    def fake_deliver(episode_id, title, thesis, topics, insights):
+        return "/srv/pap/summaries/test.md"
 
-    monkeypatch.setattr("courier.telegram.TelegramClient.send_message", fake_send_message)
-    result = podcast_agent_pipeline("https://example.com/episode", "feed", "guid123", "~/output/%(ext)s")
-    assert result.endswith(".md")
+    monkeypatch.setattr("flows.pipeline.deliver_task", fake_deliver)
+
+    result = summarize_episode_flow("ep1", "/srv/pap/raw/foo.mp3", "Test title")
+    assert result.endswith("test.md")
