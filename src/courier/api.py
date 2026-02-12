@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import List
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
@@ -27,6 +28,19 @@ class NotifyResponse(BaseModel):
     summary_path: str
 
 
+class WatcherEpisode(BaseModel):
+    episode_id: str
+    title: str
+    published: datetime
+    audio_path: str | None = None
+
+
+class WatcherStatusRequest(BaseModel):
+    channel: str
+    downloaded: List[WatcherEpisode] = []
+    queued: List[WatcherEpisode] = []
+
+
 def create_app() -> FastAPI:
     configure_logging()
     app = FastAPI(title="Courier Service", version="0.1.0")
@@ -47,6 +61,15 @@ def create_app() -> FastAPI:
             request.insights,
         )
         return NotifyResponse(summary_path=str(path))
+
+    @app.post("/watcher-status", status_code=status.HTTP_204_NO_CONTENT, tags=["notifications"])
+    async def watcher_status(request: WatcherStatusRequest) -> None:
+        await service.send_watcher_update(
+            request.channel,
+            [episode.model_dump() for episode in request.downloaded],
+            [episode.model_dump() for episode in request.queued],
+        )
+        return None
 
     return app
 

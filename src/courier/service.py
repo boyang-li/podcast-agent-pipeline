@@ -31,6 +31,10 @@ class CourierService:
         await self.telegram_client.send_document(path, caption=f"Full notes • {title}")
         return path
 
+    async def send_watcher_update(self, channel: str, downloaded: List[dict], queued: List[dict]) -> None:
+        message = _build_watcher_message(channel, downloaded, queued)
+        await self.telegram_client.send_message(message)
+
 
 def send_summary_sync(service: CourierService, episode_id: str, title: str, thesis: str, topics: List[str], insights: List[str]) -> Path:
     return asyncio.run(service.send_summary(episode_id, title, thesis, topics, insights))
@@ -59,3 +63,28 @@ def _format_list_section(label: str, values: List[str]) -> str:
     remainder = len(values) - _PREVIEW_BULLET_LIMIT
     extra = f"\n… (+{remainder} more)" if remainder > 0 else ""
     return f"{label}:\n{bullet_lines}{extra}"
+
+
+def _build_watcher_message(channel: str, downloaded: List[dict], queued: List[dict]) -> str:
+    lines = [f"Watcher update • {channel}"]
+    if downloaded:
+        lines.append("\nDownloaded episodes:")
+        for item in downloaded:
+            lines.append(_format_episode_line(item))
+    else:
+        lines.append("\nDownloaded episodes: none")
+
+    if queued:
+        lines.append("\nSummaries triggered:")
+        for item in queued:
+            lines.append(_format_episode_line(item))
+    else:
+        lines.append("\nSummaries triggered: none")
+    return "\n".join(lines)
+
+
+def _format_episode_line(item: dict) -> str:
+    published = item.get("published") or ""
+    title = item.get("title", "")
+    episode_id = item.get("episode_id", "")
+    return f" • {published} — {title} ({episode_id})"
