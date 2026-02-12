@@ -57,10 +57,6 @@ def _output_template(channel_name: str, guid: str) -> str:
 def download_episode(item: FeedItem, settings: Settings) -> str | None:
     ensure_storage_dirs()
     ledger = DownloadLedger(LEDGER_PATH)
-    if ledger.has_guid(item.guid):
-        logging.info("skipping already downloaded episode", extra={"guid": item.guid})
-        ledger.close()
-        return None
     template = _output_template(item.feed_id, item.guid)
     path = download_audio(item.link, template)
     ledger.record(item.guid, item.feed_id, path)
